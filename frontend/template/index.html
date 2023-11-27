@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>LLM Chat</title>
+        <style>
+            body, html {
+                padding: 0;
+                margin: 0;
+            }
+
+            #chat-scroll {
+                position: absolute;
+                bottom: 70px;
+                top: 0;
+                left: 0;
+                right: 0;
+                overflow-y: auto;
+            }
+
+            .chat-system {
+                font-size: 1em;
+                color: #c9c9c9;
+                text-align: center;
+                font-family: sans-serif;
+            }
+
+            .chat-assistant {
+                margin: 6px 10% 6px 10%;
+                background-color: #f6f6f6;
+                font-family: sans-serif;
+                padding: 6px 8px;
+                border-radius: 10px;
+            }
+
+            .chat-user {
+                margin: 6px 10% 6px 10%;
+                background-color: #e3effd;
+                font-family: sans-serif;
+                padding: 6px 8px;
+                border-radius: 10px;
+            }
+
+            .chat-bottom {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 70px;
+                text-align: center;
+            }
+
+            #chat-input {
+                background-color: #ffffff;
+                border: solid 1px #E0E0E0;
+                width: 73%;
+                height: 48px;
+                padding: 6px 8px;
+                border-radius: 10px;
+                font-family: sans-serif;
+            }
+
+            #chat-ask {
+                background-color: #4F6EC1;
+                color: #ffffff;
+                border: 1px solid rgba(0 0 0 / 0.5);
+                border-radius: 50%;
+                height: 48px;
+                width: 48px;
+                transform: translateY(-26px);
+            }
+
+            /* Markdown */
+            .chat-user > p,
+            .chat-assistant > p {
+                padding: 0;
+                margin: 4px;
+            }
+
+            .chat-assistant > pre {
+                background: #002b36;
+                color: #fdf6e3;
+                font-family: monospace;
+                margin: 8px;
+                padding: 12px;
+                border-radius: 10px;
+            }
+
+            .chat-assistant > p > code {
+                font-family: monospace;
+                background: #268bd2;
+                /*background: #002b36;*/
+                color: #fdf6e3;
+                padding: 1px 3px;
+                border-radius: 4px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="chat-scroll"></div>
+        <div class="chat-bottom">
+            <textarea id="chat-input"></textarea>
+            <button id="chat-ask" onclick="App.reset();">Reset</button>
+            <button id="chat-ask" onclick="App.ask();">Ask</button>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+<script>
+let App = {
+
+    urlService: 'http://localhost:8080',
+
+    messages: null,
+
+    input: document.getElementById('chat-input'),
+    scroll: document.getElementById('chat-scroll'),
+    mdConverter: new showdown.Converter(),
+
+    appendMessage: (message) => {
+        
+        App.messages.push(message);
+
+        if( message['content'].includes('`') ){
+            var messageHTML = App.mdConverter.makeHtml( message['content'] );
+        } else {
+            var messageHTML = '<p>' + message['content'].replaceAll('\n', '</br>') + '</p>';
+        }
+        
+        var bubble = document.createElement('div');
+        bubble.classList.add('chat-' + message['role']);
+        bubble.innerHTML = messageHTML;
+        App.scroll.appendChild(bubble);
+
+        App.scroll.scrollTop = App.scroll.scrollHeight;
+    },
+
+    ask: () => {
+
+        if( App.input.value != '' ){
+
+            App.appendMessage({
+                'role': 'user',
+                'content': App.input.value
+            });
+
+            App.input.value = '';
+
+            fetch(App.urlService + '/v1/chat/completions', {
+                method: 'post',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    'messages': App.messages,
+                    'max_tokens': 1024
+                })
+            }).then(response => {
+                if (response.status === 200) {
+                    return response.json()
+                }
+            }).then(response => {
+                App.appendMessage( response.choices[0].message );
+            })
+        }
+
+    },
+
+    reset: () => {
+
+        App.urlService = prompt('URL Service:', 'http://localhost:8000');
+        
+        var systemDirective = prompt('System:', 'You are an AI assistant');
+
+        App.messages = [
+            {
+                "content": systemDirective,
+                "role": "system"
+            }
+        ];
+
+        App.scroll.innerHTML = '<p class="chat-system">'+ systemDirective +'</p>';
+        App.input.focus();
+
+    },
+};
+
+window.onload = () => {
+    App.input.addEventListener('keydown', event => {
+        if( ( event.metaKey || event.ctrlKey ) && event.code == 'Enter' )
+            App.ask();
+    });
+    App.reset();
+};
+</script>
+
+    </body>
+</html>

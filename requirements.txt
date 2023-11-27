@@ -1,0 +1,3 @@
+llama-cpp-python==0.2.19
+llama-cpp-python[server]==0.2.19
+Flask==3.0.0
