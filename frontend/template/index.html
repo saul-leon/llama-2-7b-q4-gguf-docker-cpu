@@ -61,7 +61,7 @@
                 font-family: sans-serif;
             }
 
-            #chat-ask {
+            .chat-button {
                 background-color: #4F6EC1;
                 color: #ffffff;
                 border: 1px solid rgba(0 0 0 / 0.5);
@@ -101,14 +101,14 @@
         <div id="chat-scroll"></div>
         <div class="chat-bottom">
             <textarea id="chat-input"></textarea>
-            <button id="chat-ask" onclick="App.reset();">Reset</button>
-            <button id="chat-ask" onclick="App.ask();">Ask</button>
+            <button class="chat-button" onclick="App.reset();">Reset</button>
+            <button class="chat-button" onclick="App.ask();">Ask</button>
         </div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
 <script>
 let App = {
 
-    urlService: 'http://localhost:8080',
+    urlService: window.location.protocol + '//' + window.location.host + ':8080',
 
     messages: null,
 
@@ -120,10 +120,14 @@ let App = {
         
         App.messages.push(message);
 
-        if( message['content'].includes('`') ){
-            var messageHTML = App.mdConverter.makeHtml( message['content'] );
+        var content = message['content'].trim();
+
+        if( content == '' ){
+            var messageHTML = '<p>LLM generates an empty response</p>';
+        } else if( content.includes('`') ){
+            var messageHTML = App.mdConverter.makeHtml( content );
         } else {
-            var messageHTML = '<p>' + message['content'].replaceAll('\n', '</br>') + '</p>';
+            var messageHTML = '<p>' + content.replaceAll('\n', '</br>') + '</p>';
         }
         
         var bubble = document.createElement('div');
@@ -143,7 +147,8 @@ let App = {
                 'content': App.input.value
             });
 
-            App.input.value = '';
+            App.input.setAttribute('disabled', 'disabled');
+            App.input.value = 'Waiting response...';
 
             fetch(App.urlService + '/v1/chat/completions', {
                 method: 'post',
@@ -161,6 +166,9 @@ let App = {
                 }
             }).then(response => {
                 App.appendMessage( response.choices[0].message );
+                App.input.removeAttribute('disabled');
+                App.input.value = '';
+                App.input.focus();
             })
         }
 
@@ -168,9 +176,7 @@ let App = {
 
     reset: () => {
 
-        App.urlService = prompt('URL Service:', 'http://localhost:8000');
-        
-        var systemDirective = prompt('System:', 'You are an AI assistant');
+        var systemDirective = prompt('System:', 'You are an AI assistant.');
 
         App.messages = [
             {
@@ -180,18 +186,22 @@ let App = {
         ];
 
         App.scroll.innerHTML = '<p class="chat-system">'+ systemDirective +'</p>';
+        App.input.removeAttribute('disabled');
+        App.input.value = '';
         App.input.focus();
 
     },
+
+    init: () => {
+        App.input.addEventListener('keydown', event => {
+            if( ( event.metaKey || event.ctrlKey ) && event.code == 'Enter' )
+                App.ask();
+        });
+        App.reset();
+    }
 };
 
-window.onload = () => {
-    App.input.addEventListener('keydown', event => {
-        if( ( event.metaKey || event.ctrlKey ) && event.code == 'Enter' )
-            App.ask();
-    });
-    App.reset();
-};
+window.onload = App.init;
 </script>
 
     </body>
